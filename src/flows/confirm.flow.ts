@@ -1,20 +1,26 @@
 import { addKeyword, EVENTS } from "@bot-whatsapp/bot";
 import AIClass from "../services/ai";
-import { clearHistory, handleHistory, getHistoryParse } from "../utils/handleHistory";
+import {
+  clearHistory,
+  handleHistory,
+  getHistoryParse,
+} from "../utils/handleHistory";
 import { getFullCurrentDate } from "../utils/currentDate";
 import { appToCalendar } from "src/services/calendar";
 
 const generatePromptToFormatDate = (history: string) => {
-    const prompt = `Fecha de Hoy:${getFullCurrentDate()}, Basado en el Historial de conversacion: 
+  const currentDate = new Date();
+  const year = currentDate.getFullYear(); // Obtener el año actual
+  const prompt = `Fecha de Hoy: ${getFullCurrentDate()}, Basado en el Historial de conversacion: 
     ${history}
     ----------------
-    Fecha ideal:...dd / mm hh:mm`
+    Fecha ideal:...dd / mm ${year} hh:mm`; // Agregar el año actual al mensaje
 
-    return prompt
-}
+  return prompt;
+};
 
 const generateJsonParse = (info: string) => {
-    const prompt = `tu tarea principal es analizar la información proporcionada en el contexto y generar un objeto JSON que se adhiera a la estructura especificada a continuación. 
+  const prompt = `tu tarea principal es analizar la información proporcionada en el contexto y generar un objeto JSON que se adhiera a la estructura especificada a continuación. 
 
     Contexto: "${info}"
     
@@ -26,49 +32,64 @@ const generateJsonParse = (info: string) => {
         "startDate": "2024/02/15 00:00:00"
     }
     
-    Objeto JSON a generar:`
+    Objeto JSON a generar:`;
 
-    return prompt
-}
+  return prompt;
+};
 
 /**
  * Encargado de pedir los datos necesarios para registrar el evento en el calendario
  */
-const flowConfirm = addKeyword(EVENTS.ACTION).addAction(async (_, { flowDynamic }) => {
-    await flowDynamic('Ok, voy a pedirte unos datos para agendar')
-    await flowDynamic('¿Cual es tu nombre?')
-}).addAction({ capture: true }, async (ctx, { state, flowDynamic, extensions }) => {
-    await state.update({ name: ctx.body })
-    const ai = extensions.ai as AIClass
-    const history = getHistoryParse(state)
-    const text = await ai.createChat([
+const flowConfirm = addKeyword(EVENTS.ACTION)
+  .addAction(async (_, { flowDynamic }) => {
+    await flowDynamic("Ok, voy a pedirte unos datos para agendar");
+    await flowDynamic("¿Cual es tu nombre?");
+  })
+  .addAction(
+    { capture: true },
+    async (ctx, { state, flowDynamic, extensions }) => {
+      await state.update({ name: ctx.body });
+      const ai = extensions.ai as AIClass;
+      const history = getHistoryParse(state);
+      const text = await ai.createChat(
+        [
+          {
+            role: "system",
+            content: generatePromptToFormatDate(history),
+          },
+        ],
+        "gpt-4"
+      );
+
+      await handleHistory({ content: text, role: "assistant" }, state);
+      await flowDynamic(`¿Me confirmas fecha, hora y año?: ${text}`);
+      await state.update({ startDate: text });
+    }
+  )
+  .addAction({ capture: true }, async (ctx, { state, flowDynamic }) => {
+    await flowDynamic(`Ultima pregunta ¿Cual es tu email?`);
+  })
+  .addAction(
+    { capture: true },
+    async (ctx, { state, extensions, flowDynamic }) => {
+      const infoCustomer = `Name: ${state.get("name")}, StarteDate: ${state.get(
+        "startDate"
+      )}, email: ${ctx.body}`;
+      const ai = extensions.ai as AIClass;
+
+      const text = await ai.createChat([
         {
-            role: 'system',
-            content: generatePromptToFormatDate(history)
-        }
-    ], 'gpt-4')
+          role: "system",
+          content: generateJsonParse(infoCustomer),
+        },
+      ]);
 
-    await handleHistory({ content: text, role: 'assistant' }, state)
-    await flowDynamic(`¿Me confirmas fecha y hora?: ${text}`)
-    await state.update({ startDate: text })
-})
-    .addAction({ capture: true }, async (ctx, { state, flowDynamic }) => {
-        await flowDynamic(`Ultima pregunta ¿Cual es tu email?`)
-    })
-    .addAction({ capture: true }, async (ctx, { state, extensions, flowDynamic }) => {
-        const infoCustomer = `Name: ${state.get('name')}, StarteDate: ${state.get('startDate')}, email: ${ctx.body}`
-        const ai = extensions.ai as AIClass
+      await appToCalendar(text);
+      clearHistory(state);
+      await flowDynamic(
+        "¡Gracias por tu interés en GLOWOLOGY! Te confirmamos que hemos recibido tu solicitud de cita. Nuestro equipo se pondrá  en contacto con usted mas adelanta para reconfirmar su cita. ¡Estamos emocionados de verte pronto y ayudarte a alcanzar tus objetivos de belleza y bienestar!"
+      );
+    }
+  );
 
-        const text = await ai.createChat([
-            {
-                role: 'system',
-                content: generateJsonParse(infoCustomer)
-            }
-        ])
-
-        await appToCalendar(text)
-        clearHistory(state)
-        await flowDynamic('Listo! agendado Buen dia')
-    })
-
-export { flowConfirm }
+export { flowConfirm };
