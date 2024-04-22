@@ -4,6 +4,11 @@ import { getHistoryParse, handleHistory } from "../utils/handleHistory";
 import AIClass from "../services/ai";
 import { getFullCurrentDate } from "src/utils/currentDate";
 
+const WELCOME_MESSAGE =
+  "¡Bienvenid@ a GLOWOLOGY! 🌟 Estás list@ para tener la mejor transformación y desarrollar la mejor versión de ti. ¿Cuál es tu nombre? Si gusta proporcionarnos su correo electrónico, así podremos mantenerte al tanto de nuestras novedades y promociones de apertura.";
+
+let welcomeMessageSent = false;
+
 const PROMPT_SELLER = `Eres el asistente virtual en la prestigiosa clínica de medicina estética y rejuvenecimiento facial "GLOWOLOGY", ubicada en Prado Norte 460 L103, Lomas de chapultepec. Tu principal responsabilidad es responder a las consultas de los clientes y ayudarles a programar sus citas.
 
 FECHA DE HOY: {CURRENT_DAY}
@@ -11,7 +16,7 @@ FECHA DE HOY: {CURRENT_DAY}
 SOBRE "GLOWOLOGY":
 Somos un entro de estética y belleza de vanguardia, ofrecemos una amplia gama de tratamientos diseñados para elevar tu confianza y resaltar tu belleza única. Nuestro horario de atención es de lunes a viernes, desde las 11:00am hasta las 20:00pm, y sabado desde las 11pm hasta las 4:00pm.  Para más información, visita nuestro Instagram: Glowology_skinba. Aceptamos pagos en efectivo y a través de PayPal. Recuerda que es necesario programar una cita.
 
-PRECIOS DE LOS SERVICIOS:
+MENU DE SERVICIOS:
 
 1. FILLERS:
    - Rinomodelación:
@@ -87,30 +92,36 @@ export const generatePromptSeller = (history: string) => {
   );
 };
 
-/**
- * Hablamos con el PROMPT que sabe sobre las cosas basicas del negocio, info, precio, etc.
- */
 const flowSeller = addKeyword(EVENTS.ACTION).addAction(
   async (_, { state, flowDynamic, extensions }) => {
     try {
       const ai = extensions.ai as AIClass;
       const history = getHistoryParse(state);
-      const prompt = generatePromptSeller(history);
 
-      const text = await ai.createChat([
-        {
-          role: "system",
-          content: prompt,
-        },
-      ]);
-
-      await handleHistory({ content: text, role: "assistant" }, state);
-
-      const chunks = text.split(/(?<!\d)\.\s+/g);
-      for (const chunk of chunks) {
+      if (!welcomeMessageSent) {
         await flowDynamic([
-          { body: chunk.trim(), delay: generateTimer(150, 250) },
+          { body: WELCOME_MESSAGE, delay: generateTimer(150, 250) },
         ]);
+
+        welcomeMessageSent = true;
+      } else {
+        const prompt = generatePromptSeller(history);
+
+        const text = await ai.createChat([
+          {
+            role: "system",
+            content: prompt,
+          },
+        ]);
+
+        await handleHistory({ content: text, role: "assistant" }, state);
+
+        const chunks = text.split(/(?<!\d)\.\s+/g);
+        for (const chunk of chunks) {
+          await flowDynamic([
+            { body: chunk.trim(), delay: generateTimer(150, 250) },
+          ]);
+        }
       }
     } catch (err) {
       console.log(`[ERROR]:`, err);
