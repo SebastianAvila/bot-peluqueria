@@ -42,7 +42,9 @@ const generateJsonParse = (info: string) => {
  */
 const flowConfirm = addKeyword(EVENTS.ACTION)
   .addAction(async (_, { flowDynamic }) => {
-    await flowDynamic("Ok, voy a pedirte unos datos para agendar");
+    await flowDynamic(
+      "¡Claro!, Para te pedire unos datos para personalizar tu experiencia."
+    );
     await flowDynamic("¿Cual es tu nombre?");
   })
   .addAction(
@@ -62,11 +64,17 @@ const flowConfirm = addKeyword(EVENTS.ACTION)
       );
 
       await handleHistory({ content: text, role: "assistant" }, state);
-      await flowDynamic(`¿Me confirmas fecha, hora y año?: ${text}`);
+      await flowDynamic(
+        `Para agendar tu cita, ¿Me confirmas fecha y hora ?: ${text}`
+      );
       await state.update({ startDate: text });
     }
   )
   .addAction({ capture: true }, async (ctx, { state, flowDynamic }) => {
+    await flowDynamic(`¿Qué tipo de tratamiento te gustaría recibir?`);
+  })
+  .addAction({ capture: true }, async (ctx, { state, flowDynamic }) => {
+    await state.update({ treatmentType: ctx.body });
     await flowDynamic(`Ultima pregunta ¿Cual es tu email?`);
   })
   .addAction(
@@ -74,7 +82,7 @@ const flowConfirm = addKeyword(EVENTS.ACTION)
     async (ctx, { state, extensions, flowDynamic }) => {
       const infoCustomer = `Name: ${state.get("name")}, StarteDate: ${state.get(
         "startDate"
-      )}, email: ${ctx.body}`;
+      )}, email: ${ctx.body}, TreatmentType: ${state.get("treatmentType")}`;
       const ai = extensions.ai as AIClass;
 
       const text = await ai.createChat([
@@ -87,7 +95,7 @@ const flowConfirm = addKeyword(EVENTS.ACTION)
       await appToCalendar(text);
       clearHistory(state);
       await flowDynamic(
-        "¡Gracias por tu interés en GLOWOLOGY! Te confirmamos que hemos recibido tu solicitud de cita. Nuestro equipo se pondrá  en contacto con usted mas adelanta para reconfirmar su cita. ¡Estamos emocionados de verte pronto y ayudarte a alcanzar tus objetivos de belleza y bienestar!"
+        "¡Gracias por tu interés en GLOWOLOGY! Te confirmamos que hemos recibido tu solicitud de cita. Nuestro equipo se pondrá  en contacto con usted mas adelanta para reconfirmar su cita. ¡Estamos emocionados de verte pronto y ayudarte a alcanzar tus objetivos de belleza y bienestar!"
       );
     }
   );
