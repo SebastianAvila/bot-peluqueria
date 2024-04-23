@@ -60,7 +60,7 @@ const flowConfirm = addKeyword(EVENTS.ACTION)
             content: generatePromptToFormatDate(history),
           },
         ],
-        "gpt-4"
+        "gpt-3.5-turbo-16k"
       );
 
       await handleHistory({ content: text, role: "assistant" }, state);
